@@ -106,8 +106,33 @@ function WaypointCard({ wp, index, isActive }) {
         {wp.subtitle}
       </p>
 
-      {/* Street View Image */}
-      {API_KEY && (
+      {/* Street View Image or No Coverage */}
+      {wp.visual === null ? (
+        <div style={{
+          marginBottom: '1.5rem',
+          borderRadius: '8px',
+          border: '1px dashed #333',
+          padding: '4rem 2rem',
+          textAlign: 'center',
+          background: '#0d0d0d',
+        }}>
+          <div style={{ fontSize: '2rem', marginBottom: '1rem', opacity: 0.3 }}>🌑</div>
+          <div style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '0.8rem',
+            color: '#444',
+          }}>
+            &quot;Sorry, we have no imagery here.&quot;
+          </div>
+          <div style={{
+            fontSize: '0.75rem',
+            color: '#333',
+            marginTop: '0.5rem',
+          }}>
+            이것도 여행의 일부다.
+          </div>
+        </div>
+      ) : API_KEY ? (
         <div style={{
           marginBottom: '1.5rem',
           borderRadius: '8px',
@@ -121,7 +146,7 @@ function WaypointCard({ wp, index, isActive }) {
             loading="lazy"
           />
         </div>
-      )}
+      ) : null}
 
       {/* Three Tracks */}
       <TrackBadge type="visual">{wp.visual}</TrackBadge>
@@ -201,7 +226,7 @@ export default function Home() {
         }}>
           클로디는 골목을 걸었다. 오스카는 같은 골목을 해부한다.
           <br />
-          같은 8개 포인트. 완전히 다른 눈.
+          같은 12개 포인트. 완전히 다른 눈.
         </p>
 
         <div style={{
@@ -250,9 +275,17 @@ export default function Home() {
           fontSize: '1.3rem',
           color: '#8b4553',
           fontStyle: 'italic',
-          marginBottom: '1rem',
+          marginBottom: '0.5rem',
         }}>
           &ldquo;나는 이곳에 온 적이 없다.&rdquo;
+        </p>
+        <p style={{
+          fontSize: '0.85rem',
+          color: '#c9a961',
+          fontFamily: "'JetBrains Mono', monospace",
+          marginBottom: '1rem',
+        }}>
+          총 거리: 2.3km — 이동한 시간: 2,200년
         </p>
         <p style={{
           fontSize: '0.8rem',
