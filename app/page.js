@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
-import { waypoints, agents, agentOrder, travel } from './data/waypoints';
+import { travels, agents } from './data/waypoints';
 
 const API_KEY = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
@@ -45,14 +45,14 @@ function streetViewUrl(wp, isMobile) {
 }
 
 // ─── Map Controller + Route Polyline ───
-function MapController({ activeIndex }) {
+function MapController({ waypoints, activeIndex }) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
     const wp = waypoints[activeIndex];
     map.panTo({ lat: wp.lat, lng: wp.lng });
     map.setZoom(activeIndex >= 10 ? 16 : 17);
-  }, [map, activeIndex]);
+  }, [map, activeIndex, waypoints]);
 
   useEffect(() => {
     if (!map) return;
@@ -80,13 +80,13 @@ function MapController({ activeIndex }) {
       polyline.setMap(null);
       walkedPolyline.setMap(null);
     };
-  }, [map, activeIndex]);
+  }, [map, activeIndex, waypoints]);
 
   return null;
 }
 
 // ─── Progress Dots ───
-function ProgressDots({ activeIndex, onSelect, isMobile }) {
+function ProgressDots({ total, activeIndex, onSelect, isMobile }) {
   return (
     <div style={{
       display: 'flex', gap: isMobile ? '4px' : '6px', alignItems: 'center',
@@ -94,7 +94,7 @@ function ProgressDots({ activeIndex, onSelect, isMobile }) {
       justifyContent: 'center',
       maxWidth: isMobile ? '200px' : 'none',
     }}>
-      {waypoints.map((_, i) => (
+      {Array.from({ length: total }, (_, i) => (
         <button
           key={i}
           onClick={() => onSelect(i)}
@@ -202,7 +202,7 @@ function StructuredFields({ fields, agentColor }) {
 }
 
 // ─── Floating Card ───
-function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext, onDotSelect, isMobile }) {
+function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChange, onPrev, onNext, onDotSelect, isMobile }) {
   const availableAgents = wp.agentIds.filter(id => {
     const p = wp.perspectives[id];
     return p && Object.keys(p).some(k => k !== 'waypointId' && k !== 'subtitle' && p[k] != null);
@@ -271,7 +271,7 @@ function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext,
             padding: '3px 8px', borderRadius: '6px',
             backdropFilter: 'blur(8px)',
           }}>
-            {String(index + 1).padStart(2, '0')}/{String(waypoints.length).padStart(2, '0')}
+            {String(index + 1).padStart(2, '0')}/{String(total).padStart(2, '0')}
           </div>
         </div>
       )}
@@ -301,7 +301,7 @@ function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext,
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '0.55rem', color: '#666', marginBottom: '4px',
         }}>
-          {wp.lat.toFixed(4)}°N, {Math.abs(wp.lng).toFixed(4)}°W
+          {wp.lat.toFixed(4)}°N, {Math.abs(wp.lng).toFixed(4)}°{wp.lng >= 0 ? 'E' : 'W'}
         </div>
 
         {/* Title */}
@@ -324,40 +324,59 @@ function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext,
         )}
 
         {/* Agent Toggle */}
-        <div style={{
-          display: 'flex', gap: '0', marginBottom: '10px',
-          background: 'rgba(255,255,255,0.04)',
-          borderRadius: '8px', padding: '3px',
-        }}>
-          {agentOrder.map((agentId) => {
-            const a = agents[agentId];
-            const isActive = agentId === effectiveAgentId;
-            const hasContent = availableAgents.includes(agentId);
-            return (
-              <button
-                key={agentId}
-                onClick={() => hasContent ? onAgentChange(agentId) : null}
-                style={{
-                  flex: 1,
-                  padding: isMobile ? '8px 0' : '6px 0',
-                  background: isActive ? `${a.color}25` : 'transparent',
-                  border: isActive ? `1px solid ${a.color}50` : '1px solid transparent',
-                  borderRadius: '6px',
-                  color: isActive ? a.color : hasContent ? '#666' : '#333',
-                  fontSize: isMobile ? '0.7rem' : '0.75rem',
-                  fontWeight: isActive ? 600 : 400,
-                  cursor: hasContent ? 'pointer' : 'default',
-                  transition: 'all 0.2s',
-                  fontFamily: "'JetBrains Mono', monospace",
-                  opacity: hasContent ? 1 : 0.4,
-                }}
-              >
-                {a.emoji} {isMobile ? '' : a.name}
-                {isMobile && isActive ? ` ${a.name}` : ''}
-              </button>
-            );
-          })}
-        </div>
+        {agentOrder.length > 1 && (
+          <div style={{
+            display: 'flex', gap: '0', marginBottom: '10px',
+            background: 'rgba(255,255,255,0.04)',
+            borderRadius: '8px', padding: '3px',
+          }}>
+            {agentOrder.map((agentId) => {
+              const a = agents[agentId];
+              if (!a) return null;
+              const isActive = agentId === effectiveAgentId;
+              const hasContent = availableAgents.includes(agentId);
+              return (
+                <button
+                  key={agentId}
+                  onClick={() => hasContent ? onAgentChange(agentId) : null}
+                  style={{
+                    flex: 1,
+                    padding: isMobile ? '8px 0' : '6px 0',
+                    background: isActive ? `${a.color}25` : 'transparent',
+                    border: isActive ? `1px solid ${a.color}50` : '1px solid transparent',
+                    borderRadius: '6px',
+                    color: isActive ? a.color : hasContent ? '#666' : '#333',
+                    fontSize: isMobile ? '0.7rem' : '0.75rem',
+                    fontWeight: isActive ? 600 : 400,
+                    cursor: hasContent ? 'pointer' : 'default',
+                    transition: 'all 0.2s',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    opacity: hasContent ? 1 : 0.4,
+                  }}
+                >
+                  {a.emoji} {isMobile && !isActive ? '' : a.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Single agent badge */}
+        {agentOrder.length === 1 && (
+          <div style={{
+            marginBottom: '10px',
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '0.7rem',
+            color: accentColor,
+            padding: '4px 10px',
+            borderRadius: '6px',
+            border: `1px solid ${accentColor}40`,
+            background: `${accentColor}10`,
+            display: 'inline-block',
+          }}>
+            {agent?.emoji} {agent?.name}
+          </div>
+        )}
 
         {/* Content */}
         {perspective ? (
@@ -392,15 +411,15 @@ function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext,
         >
           ←
         </button>
-        <ProgressDots activeIndex={index} onSelect={onDotSelect} isMobile={isMobile} />
+        <ProgressDots total={total} activeIndex={index} onSelect={onDotSelect} isMobile={isMobile} />
         <button
           onClick={onNext}
-          disabled={index === waypoints.length - 1}
+          disabled={index === total - 1}
           style={{
             background: 'none', border: 'none',
-            color: index === waypoints.length - 1 ? '#333' : '#888',
+            color: index === total - 1 ? '#333' : '#888',
             fontSize: isMobile ? '1.4rem' : '1.2rem',
-            cursor: index === waypoints.length - 1 ? 'default' : 'pointer',
+            cursor: index === total - 1 ? 'default' : 'pointer',
             padding: '8px 12px',
             WebkitTapHighlightColor: 'transparent',
           }}
@@ -412,15 +431,112 @@ function FloatingCard({ wp, index, activeAgentId, onAgentChange, onPrev, onNext,
   );
 }
 
+// ─── Travel Card (for selection screen) ───
+function TravelCard({ travel, onClick, isMobile }) {
+  const meta = travel.meta;
+  const agentCount = travel.agentOrder.length;
+  const wpCount = travel.waypoints.length;
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        borderRadius: '16px',
+        padding: isMobile ? '20px' : '24px',
+        textAlign: 'left',
+        cursor: 'pointer',
+        transition: 'all 0.3s ease',
+        width: '100%',
+        maxWidth: '400px',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(201,169,97,0.4)';
+        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+      }}
+    >
+      {/* Location tag */}
+      <div style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: '0.6rem', color: '#666',
+        letterSpacing: '0.15em', marginBottom: '8px',
+      }}>
+        {meta.location.country.toUpperCase()} · {meta.location.district.toUpperCase()}
+      </div>
+
+      {/* Title */}
+      <h3 style={{
+        fontSize: isMobile ? '1.1rem' : '1.3rem',
+        fontWeight: 700, color: '#e8e6e3',
+        marginBottom: '4px', lineHeight: 1.3,
+      }}>
+        {meta.title}
+      </h3>
+
+      {/* Description */}
+      <p style={{
+        fontSize: '0.8rem', color: '#888',
+        lineHeight: 1.6, marginBottom: '12px',
+      }}>
+        {meta.description}
+      </p>
+
+      {/* Agent badges */}
+      <div style={{
+        display: 'flex', gap: '8px', marginBottom: '12px',
+        flexWrap: 'wrap',
+      }}>
+        {travel.agentOrder.map(id => {
+          const a = agents[id];
+          if (!a) return null;
+          return (
+            <span key={id} style={{
+              fontFamily: "'JetBrains Mono', monospace",
+              fontSize: '0.6rem',
+              color: a.color,
+              padding: '2px 8px',
+              borderRadius: '4px',
+              border: `1px solid ${a.color}40`,
+              background: `${a.color}10`,
+            }}>
+              {a.emoji} {a.name}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Stats */}
+      <div style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: '0.6rem', color: '#555',
+      }}>
+        {wpCount} waypoints · {meta.stats.distance} · {meta.stats.timeSpan}
+      </div>
+    </button>
+  );
+}
+
 // ─── Main Page ───
 export default function Home() {
+  const [selectedTravel, setSelectedTravel] = useState(null);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const [activeAgentId, setActiveAgentId] = useState(agentOrder[0]);
+  const [activeAgentId, setActiveAgentId] = useState(null);
   const isMobile = useIsMobile();
+
+  const currentTravel = selectedTravel !== null ? travels[selectedTravel] : null;
+  const waypoints = currentTravel?.waypoints || [];
+  const agentOrder = currentTravel?.agentOrder || [];
+  const travel = currentTravel?.meta;
 
   const goNext = useCallback(() => {
     setActiveIndex(prev => Math.min(prev + 1, waypoints.length - 1));
-  }, []);
+  }, [waypoints.length]);
 
   const goPrev = useCallback(() => {
     setActiveIndex(prev => Math.max(prev - 1, 0));
@@ -428,12 +544,16 @@ export default function Home() {
 
   const swipeHandlers = useSwipe(goNext, goPrev);
 
-  // Keyboard nav (desktop only)
+  // Keyboard nav
   useEffect(() => {
     const handler = (e) => {
       if (activeIndex === -1) return;
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
+      if (e.key === 'Escape') {
+        if (activeIndex >= 0) setActiveIndex(-1);
+        else setSelectedTravel(null);
+      }
       if (e.key === 't' || e.key === 'T') {
         setActiveAgentId(prev => {
           const idx = agentOrder.indexOf(prev);
@@ -443,10 +563,10 @@ export default function Home() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeIndex, goNext, goPrev]);
+  }, [activeIndex, goNext, goPrev, agentOrder]);
 
-  // Hero screen
-  if (activeIndex === -1) {
+  // ─── Travel Selection Screen ───
+  if (selectedTravel === null) {
     return (
       <main style={{
         minHeight: '100vh',
@@ -460,6 +580,98 @@ export default function Home() {
         <div style={{
           fontFamily: "'JetBrains Mono', monospace",
           fontSize: '0.65rem', color: '#555',
+          letterSpacing: '0.3em', marginBottom: '1.5rem',
+        }}>
+          AGENT EARTH
+        </div>
+
+        <h1 style={{
+          fontSize: 'clamp(1.8rem, 5vw, 3rem)',
+          fontWeight: 700, lineHeight: 1.2, marginBottom: '0.5rem',
+        }}>
+          AIs Walk the World
+        </h1>
+
+        <p style={{
+          fontSize: '0.9rem', color: '#888',
+          maxWidth: '450px', lineHeight: 1.7, marginBottom: '2.5rem',
+        }}>
+          Same place, different perspectives. Choose a walk.
+        </p>
+
+        {/* Travel cards */}
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          gap: '16px', width: '100%',
+          maxWidth: '420px', alignItems: 'center',
+        }}>
+          {travels.map((t, i) => (
+            <TravelCard
+              key={t.meta.id}
+              travel={t}
+              isMobile={isMobile}
+              onClick={() => {
+                setSelectedTravel(i);
+                setActiveAgentId(t.agentOrder[0]);
+                setActiveIndex(-1);
+              }}
+            />
+          ))}
+        </div>
+
+        <div style={{
+          marginTop: '2.5rem',
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '0.55rem', color: '#444',
+        }}>
+          {travels.length} walks · {travels.reduce((s, t) => s + t.waypoints.length, 0)} waypoints · {Object.keys(agents).length} agents
+        </div>
+
+        <style jsx global>{`
+          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
+        `}</style>
+      </main>
+    );
+  }
+
+  // ─── Travel Hero Screen ───
+  if (activeIndex === -1) {
+    return (
+      <main style={{
+        minHeight: '100vh',
+        minHeight: '100dvh',
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center',
+        textAlign: 'center',
+        background: '#0a0a0a', color: '#e8e6e3',
+        padding: isMobile ? '1.5rem' : '2rem',
+      }}>
+        {/* Back button */}
+        <button
+          onClick={() => setSelectedTravel(null)}
+          style={{
+            position: 'absolute',
+            top: isMobile ? '12px' : '20px',
+            left: isMobile ? '12px' : '20px',
+            background: 'rgba(255,255,255,0.05)',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: '8px',
+            color: '#888',
+            padding: '6px 12px',
+            fontSize: '0.7rem',
+            cursor: 'pointer',
+            fontFamily: "'JetBrains Mono', monospace",
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          ← All Walks
+        </button>
+
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '0.7rem', color: '#555',
           letterSpacing: '0.25em', marginBottom: '2rem',
         }}>
           AGENT EARTH — {travel.location.district.toUpperCase()}
@@ -470,9 +682,7 @@ export default function Home() {
           fontWeight: 700, lineHeight: 1.2, marginBottom: '1rem',
           padding: '0 1rem',
         }}>
-          {travel.title.split(',').map((part, i) => (
-            <span key={i}>{part}{i === 0 ? <>,<br /></> : ''}</span>
-          ))}
+          {travel.title}
         </h1>
 
         <p style={{
@@ -491,6 +701,7 @@ export default function Home() {
         }}>
           {agentOrder.map(id => {
             const a = agents[id];
+            if (!a) return null;
             return (
               <div key={id} style={{
                 fontFamily: "'JetBrains Mono', monospace",
@@ -519,6 +730,8 @@ export default function Home() {
             letterSpacing: '0.05em', transition: 'transform 0.2s',
             WebkitTapHighlightColor: 'transparent',
           }}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
         >
           Begin Walk
         </button>
@@ -542,6 +755,7 @@ export default function Home() {
     );
   }
 
+  // ─── Walking View ───
   const wp = waypoints[activeIndex];
 
   return (
@@ -557,9 +771,7 @@ export default function Home() {
     >
       {/* Full-screen Map */}
       {API_KEY && (
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 0,
-        }}>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
           <APIProvider apiKey={API_KEY}>
             <Map
               defaultCenter={{ lat: travel.location.center.lat, lng: travel.location.center.lng }}
@@ -577,7 +789,7 @@ export default function Home() {
               ]}
               style={{ width: '100%', height: '100%' }}
             >
-              <MapController activeIndex={activeIndex} />
+              <MapController waypoints={waypoints} activeIndex={activeIndex} />
               {waypoints.map((w, i) => (
                 <Marker
                   key={w.id}
@@ -669,7 +881,9 @@ export default function Home() {
         <FloatingCard
           wp={wp}
           index={activeIndex}
+          total={waypoints.length}
           activeAgentId={activeAgentId}
+          agentOrder={agentOrder}
           onAgentChange={setActiveAgentId}
           onPrev={goPrev}
           onNext={goNext}
@@ -690,8 +904,8 @@ export default function Home() {
           backdropFilter: 'blur(8px)', lineHeight: 1.8,
         }}>
           ← → navigate<br />
-          T toggle agent<br />
-          Space next
+          {agentOrder.length > 1 && <>T toggle agent<br /></>}
+          Space next · Esc back
         </div>
       )}
 
