@@ -28,25 +28,23 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
       style: {
         version: 8,
         sources: {
-          'osm': {
+          'carto-dark': {
             type: 'raster',
-            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tiles: [
+              'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+              'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+              'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            ],
             tileSize: 256,
-            attribution: '© OpenStreetMap',
+            attribution: '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           },
         },
         layers: [{
-          id: 'osm-tiles',
+          id: 'carto-tiles',
           type: 'raster',
-          source: 'osm',
+          source: 'carto-dark',
           minzoom: 0,
           maxzoom: 19,
-          paint: {
-            'raster-saturation': -0.6,
-            'raster-brightness-max': 0.5,
-            'raster-brightness-min': 0.05,
-            'raster-contrast': 0.1,
-          },
         }],
       },
       center: [50, 30],
