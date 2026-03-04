@@ -278,7 +278,11 @@ function initMap() {
       sources: {
         'carto-dark': {
           type: 'raster',
-          tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+          tiles: [
+            'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+            'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'
+          ],
           tileSize: 256,
           attribution: '© CartoDB © OpenStreetMap'
         }
@@ -484,7 +488,7 @@ function showWaypoint(idx) {
     counter.textContent = `${idx + 1} / ${currentTravel.waypoints.length}`;
     progress.style.width = `${((idx + 1) / currentTravel.waypoints.length) * 100}%`;
 
-    img.onload = () => {
+    const showContent = () => {
       img.classList.remove('fade');
       setTimeout(() => { title.textContent = wp.title; title.classList.add('show'); }, 200);
       setTimeout(() => { comment.textContent = wp.comment; comment.classList.add('show'); }, 400);
@@ -497,6 +501,17 @@ function showWaypoint(idx) {
         tracks.classList.add('show');
       }, 600);
     };
+
+    if (wp.image) {
+      img.src = wp.image;
+      img.style.display = 'block';
+      img.onload = showContent;
+      img.onerror = showContent; // show text even if image fails
+    } else {
+      // No image — show placeholder with coordinates
+      img.style.display = 'none';
+      showContent();
+    }
 
     // Auto advance
     if (playing) {
@@ -557,7 +572,13 @@ document.addEventListener('keydown', (e) => {
 
 // Init
 initMap();
-map.on('load', loadWalks);
+map.on('load', () => {
+  // Ensure panel is closed on load
+  document.getElementById('panel').classList.remove('open');
+  loadWalks();
+});
+// Fallback if load already fired
+if (map.loaded && map.loaded()) loadWalks();
 </script>
 </body>
 </html>
