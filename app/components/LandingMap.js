@@ -47,8 +47,8 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
           maxzoom: 19,
         }],
       },
-      center: [60, 35],
-      zoom: isMobile ? 1.8 : 3,
+      center: [50, 35],
+      zoom: 2,
       minZoom: 1.5,
       maxZoom: 18,
       attributionControl: false,
@@ -106,6 +106,19 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
 
       markersRef.current.push(marker);
     });
+
+    // Fit map to show all travel locations
+    if (travels.length > 0) {
+      const bounds = new maplibregl.LngLatBounds();
+      travels.forEach(t => {
+        bounds.extend([t.meta.location.center.lng, t.meta.location.center.lat]);
+      });
+      map.fitBounds(bounds, {
+        padding: isMobile ? 80 : 120,
+        maxZoom: 5,
+        duration: 0,
+      });
+    }
   }
 
   // Fly to selected or zoom out
@@ -119,9 +132,13 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
         duration: 1500,
       });
     } else {
-      mapRef.current.flyTo({
-        center: [60, 35],
-        zoom: isMobile ? 1.8 : 3,
+      const bounds = new maplibregl.LngLatBounds();
+      travels.forEach(t => {
+        bounds.extend([t.meta.location.center.lng, t.meta.location.center.lat]);
+      });
+      mapRef.current.fitBounds(bounds, {
+        padding: isMobile ? 80 : 120,
+        maxZoom: 5,
         duration: 1200,
       });
     }
