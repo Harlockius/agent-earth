@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { travels, agents } from './data/waypoints';
+import LandingMap from './components/LandingMap';
 
 const API_KEY = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
@@ -63,17 +64,6 @@ const darkMapStyles = [
   { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#333' }] },
   { featureType: 'administrative.country', elementType: 'labels', stylers: [{ visibility: 'on' }] },
 ];
-
-// ─── Map Fly-To Controller ───
-function FlyTo({ lat, lng, zoom, duration = 1500 }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map) return;
-    map.panTo({ lat, lng });
-    map.setZoom(zoom);
-  }, [map, lat, lng, zoom]);
-  return null;
-}
 
 // ─── Walk Map Controller + Route Polyline ───
 function WalkMapController({ waypoints, activeIndex }) {
@@ -504,8 +494,6 @@ export default function Home() {
   const [activeIndex, setActiveIndex] = useState(-1); // -1 = panel view, 0+ = walking
   const [activeAgentId, setActiveAgentId] = useState(null);
   const [panelTravel, setPanelTravel] = useState(null); // travel shown in side panel
-  const [mapCenter, setMapCenter] = useState({ lat: 30, lng: 50 });
-  const [mapZoom, setMapZoom] = useState(3);
   const isMobile = useIsMobile();
 
   const currentTravel = selectedTravel !== null ? travels[selectedTravel] : null;
@@ -529,7 +517,7 @@ export default function Home() {
       if (e.key === 'Escape') {
         if (activeIndex >= 0) { setActiveIndex(-1); return; }
         if (selectedTravel !== null) { setSelectedTravel(null); setPanelTravel(null); return; }
-        if (panelTravel !== null) { setPanelTravel(null); setMapCenter({ lat: 30, lng: 50 }); setMapZoom(3); return; }
+        if (panelTravel !== null) { setPanelTravel(null); return; }
         return;
       }
       if (activeIndex < 0) return;
@@ -675,54 +663,16 @@ export default function Home() {
       height: '100vh', height: '100dvh', width: '100vw',
       position: 'relative', overflow: 'hidden', background: '#0a0a0a',
     }}>
-      {/* Full-screen world map */}
-      {API_KEY && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-          <APIProvider apiKey={API_KEY}>
-            <Map
-              defaultCenter={mapCenter}
-              defaultZoom={mapZoom}
-              gestureHandling="greedy"
-              disableDefaultUI={true}
-              styles={darkMapStyles}
-              style={{ width: '100%', height: '100%' }}
-            >
-              <FlyTo lat={mapCenter.lat} lng={mapCenter.lng} zoom={mapZoom} />
-              {/* City markers */}
-              {travels.map((t, i) => {
-                const meta = t.meta;
-                const isActive = panelTravel === i;
-                return (
-                  <Marker
-                    key={meta.id}
-                    position={{ lat: meta.location.center.lat, lng: meta.location.center.lng }}
-                    onClick={() => {
-                      setPanelTravel(i);
-                      setMapCenter({ lat: meta.location.center.lat, lng: meta.location.center.lng });
-                      setMapZoom(isMobile ? 12 : 13);
-                    }}
-                    icon={{
-                      path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
-                      fillColor: isActive ? '#c9a961' : '#c9a961',
-                      fillOpacity: isActive ? 1 : 0.7,
-                      strokeColor: isActive ? '#fff' : '#c9a961',
-                      strokeWeight: isActive ? 3 : 2,
-                      scale: isActive ? 16 : 10,
-                    }}
-                    label={{
-                      text: `${meta.location.city}`,
-                      color: '#c9a961',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      className: 'city-label',
-                    }}
-                  />
-                );
-              })}
-            </Map>
-          </APIProvider>
-        </div>
-      )}
+      {/* Full-screen world map (MapLibre + OSM — free, no API key) */}
+      <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+        <LandingMap
+          travels={travels}
+          agents={agents}
+          onSelectTravel={(i) => setPanelTravel(i)}
+          selectedTravel={panelTravel}
+          isMobile={isMobile}
+        />
+      </div>
 
       {/* Logo + stats overlay */}
       <div style={{
@@ -807,8 +757,6 @@ export default function Home() {
           }}
           onClose={() => {
             setPanelTravel(null);
-            setMapCenter({ lat: 30, lng: 50 });
-            setMapZoom(3);
           }}
         />
       )}
@@ -817,7 +765,6 @@ export default function Home() {
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
-        .city-label { text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7); }
       `}</style>
     </main>
   );
