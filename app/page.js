@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
 import { travels, agents } from './data/waypoints';
 import LandingMap from './components/LandingMap';
+import WalkMap from './components/WalkMap';
 
 const API_KEY = process.env.NEXT_PUBLIC_MAPS_API_KEY;
 
@@ -52,59 +52,9 @@ const globalStats = {
   walkers: new Set(travels.flatMap(t => t.agentOrder)).size,
 };
 
-// ─── Map styles (shared) ───
-const darkMapStyles = [
-  { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-  { elementType: 'labels.text.fill', stylers: [{ color: '#666' }] },
-  { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0a0a' }] },
-  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
-  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#222' }] },
-  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#333' }] },
-  { featureType: 'administrative.country', elementType: 'labels', stylers: [{ visibility: 'on' }] },
-];
+// (Map styles removed — using CartoDB Dark Matter via MapLibre)
 
-// ─── Walk Map Controller + Route Polyline ───
-function WalkMapController({ waypoints, activeIndex }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map) return;
-    const wp = waypoints[activeIndex];
-    map.panTo({ lat: wp.lat, lng: wp.lng });
-    map.setZoom(activeIndex >= 10 ? 16 : 17);
-  }, [map, activeIndex, waypoints]);
-
-  useEffect(() => {
-    if (!map) return;
-    const path = waypoints.map(w => ({ lat: w.lat, lng: w.lng }));
-    const polyline = new google.maps.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: '#c9a961',
-      strokeOpacity: 0.4,
-      strokeWeight: 2,
-    });
-    polyline.setMap(map);
-
-    const walkedPath = waypoints.slice(0, activeIndex + 1).map(w => ({ lat: w.lat, lng: w.lng }));
-    const walkedPolyline = new google.maps.Polyline({
-      path: walkedPath,
-      geodesic: true,
-      strokeColor: '#c9a961',
-      strokeOpacity: 0.9,
-      strokeWeight: 3,
-    });
-    walkedPolyline.setMap(map);
-
-    return () => {
-      polyline.setMap(null);
-      walkedPolyline.setMap(null);
-    };
-  }, [map, activeIndex, waypoints]);
-
-  return null;
-}
+// (Walk map moved to WalkMap component)
 
 // ─── Progress Dots ───
 function ProgressDots({ total, activeIndex, onSelect, isMobile }) {
@@ -539,31 +489,15 @@ export default function Home() {
     const wp = waypoints[activeIndex];
     return (
       <main style={{ height: '100vh', height: '100dvh', width: '100vw', position: 'relative', overflow: 'hidden', background: '#0a0a0a' }} {...swipeHandlers}>
-        {API_KEY && (
-          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-            <APIProvider apiKey={API_KEY}>
-              <Map
-                defaultCenter={{ lat: travel.location.center.lat, lng: travel.location.center.lng }}
-                defaultZoom={16} gestureHandling="greedy" disableDefaultUI={true}
-                styles={darkMapStyles} style={{ width: '100%', height: '100%' }}
-              >
-                <WalkMapController waypoints={waypoints} activeIndex={activeIndex} />
-                {waypoints.map((w, i) => (
-                  <Marker key={w.id} position={{ lat: w.lat, lng: w.lng }}
-                    onClick={() => setActiveIndex(i)}
-                    label={i === activeIndex ? { text: String(i + 1), color: '#fff', fontSize: '11px', fontWeight: '700' } : undefined}
-                    icon={{
-                      path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
-                      fillColor: i === activeIndex ? '#c9a961' : i < activeIndex ? '#666' : '#333',
-                      fillOpacity: 1, strokeColor: i === activeIndex ? '#fff' : '#555',
-                      strokeWeight: 2, scale: i === activeIndex ? (isMobile ? 12 : 14) : (isMobile ? 5 : 6),
-                    }}
-                  />
-                ))}
-              </Map>
-            </APIProvider>
-          </div>
-        )}
+        {/* Walk map (MapLibre + CartoDB Dark Matter) */}
+        <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+          <WalkMap
+            waypoints={waypoints}
+            activeIndex={activeIndex}
+            center={travel.location.center}
+            onWaypointClick={(i) => setActiveIndex(i)}
+          />
+        </div>
 
         <div style={{
           position: 'absolute', bottom: 0, left: 0, right: 0, height: isMobile ? '60%' : '40%',
