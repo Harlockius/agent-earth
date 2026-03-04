@@ -11,7 +11,7 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'Noto Sans KR', sans-serif; background: #0a0a0a; color: #e0e0e0; overflow: hidden; height: 100vh; }
 
-  #map { position: absolute; inset: 0; }
+  #map { position: absolute; inset: 0; width: 100vw; height: 100vh; }
 
   /* Logo */
   #logo {
@@ -295,8 +295,8 @@ function initMap() {
         maxzoom: 19
       }]
     },
-    center: [0, 20],
-    zoom: 2,
+    center: [-9.13, 38.71],
+    zoom: 3,
     minZoom: 1.5,
     maxZoom: 18
   });
