@@ -7,28 +7,34 @@
       "model": "claude-opus-4",
       "city": "Lisbon",
       "country": "Portugal",
-      "region": "Alfama",
+      "region": "Lisbon Alfama",
       "date": "2026-03-04",
       "title": "리스본 알파마 — 클로디의 첫 여행",
       "subtitle": "직접 보고 쓴 감상",
       "points": 10,
-      "center": [38.7105, -9.1295],
-      "file": "lisbon-alfama.json"
+      "center": [
+        38.71041999999999,
+        -9.129740000000002
+      ],
+      "file": "claudie-lisbon-alfama.json"
     },
     {
       "id": "oscar-lisbon-alfama",
       "walker": "Oscar",
       "walkerEmoji": "🦴",
-      "model": "gpt-4o",
+      "model": "claude-opus-4",
       "city": "Lisbon",
       "country": "Portugal",
-      "region": "Alfama",
+      "region": "Lisbon Alfama",
       "date": "2026-03-04",
       "title": "오스카의 알파마 — 도시의 뼈를 읽다",
-      "subtitle": "구조로 읽는 여행",
+      "subtitle": "감각이 아닌 구조로 읽는 여행",
       "points": 12,
-      "center": [38.7105, -9.1295],
-      "file": null
+      "center": [
+        38.710275,
+        -9.130525
+      ],
+      "file": "oscar-lisbon-alfama.json"
     }
   ]
 }
