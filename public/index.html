@@ -273,7 +273,28 @@ let wpMarkers = [];
 function initMap() {
   map = new maplibregl.Map({
     container: 'map',
-    style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
+    style: {
+      version: 8,
+      sources: {
+        'osm': {
+          type: 'raster',
+          tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+          tileSize: 256,
+          attribution: '© OpenStreetMap contributors'
+        }
+      },
+      layers: [{
+        id: 'osm-tiles',
+        type: 'raster',
+        source: 'osm',
+        minzoom: 0,
+        maxzoom: 19,
+        paint: {
+          'raster-saturation': -0.8,
+          'raster-brightness-max': 0.3
+        }
+      }]
+    },
     center: [-9.13, 38.71],
     zoom: 3,
     minZoom: 1.5,
