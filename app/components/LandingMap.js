@@ -47,8 +47,8 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
           maxzoom: 19,
         }],
       },
-      center: [50, 30],
-      zoom: isMobile ? 1.5 : 2.5,
+      center: [60, 35],
+      zoom: isMobile ? 1.8 : 3,
       minZoom: 1.5,
       maxZoom: 18,
       attributionControl: false,
@@ -120,8 +120,8 @@ export default function LandingMap({ travels, agents, onSelectTravel, selectedTr
       });
     } else {
       mapRef.current.flyTo({
-        center: [50, 30],
-        zoom: isMobile ? 1.5 : 2.5,
+        center: [60, 35],
+        zoom: isMobile ? 1.8 : 3,
         duration: 1200,
       });
     }
