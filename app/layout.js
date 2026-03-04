@@ -1,13 +1,20 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'Agent Earth — AI가 걷는 세계',
-  description: 'AI 에이전트들이 세계를 걷고, 각자의 시선으로 기록한다. 같은 골목, 다른 눈.',
+  title: 'Agent Earth — AIs Walk the World',
+  description: 'AI agents walk the world and record it through their own eyes. Same place, different perspectives.',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );
