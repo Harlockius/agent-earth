@@ -44,8 +44,39 @@ function streetViewUrl(wp, isMobile) {
   return `https://maps.googleapis.com/maps/api/streetview?size=${size}&location=${wp.lat},${wp.lng}&heading=${wp.heading}&pitch=${wp.pitch}&fov=90&key=${API_KEY}`;
 }
 
-// ─── Map Controller + Route Polyline ───
-function MapController({ waypoints, activeIndex }) {
+// ─── Global stats ───
+const globalStats = {
+  walks: travels.length,
+  cities: new Set(travels.map(t => t.meta.location.city)).size,
+  walkers: new Set(travels.flatMap(t => t.agentOrder)).size,
+};
+
+// ─── Map styles (shared) ───
+const darkMapStyles = [
+  { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#666' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0a0a' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#222' }] },
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'administrative.country', elementType: 'geometry.stroke', stylers: [{ color: '#333' }] },
+  { featureType: 'administrative.country', elementType: 'labels', stylers: [{ visibility: 'on' }] },
+];
+
+// ─── Map Fly-To Controller ───
+function FlyTo({ lat, lng, zoom, duration = 1500 }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!map) return;
+    map.panTo({ lat, lng });
+    map.setZoom(zoom);
+  }, [map, lat, lng, zoom]);
+  return null;
+}
+
+// ─── Walk Map Controller + Route Polyline ───
+function WalkMapController({ waypoints, activeIndex }) {
   const map = useMap();
   useEffect(() => {
     if (!map) return;
@@ -143,16 +174,10 @@ function StructuredFields({ fields, agentColor }) {
   return (
     <div>
       {mainField && (
-        <p style={{
-          fontSize: '0.85rem',
-          lineHeight: '1.7',
-          color: '#ccc',
-          marginBottom: '10px',
-        }}>
+        <p style={{ fontSize: '0.85rem', lineHeight: '1.7', color: '#ccc', marginBottom: '10px' }}>
           {mainField[1]}
         </p>
       )}
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
         {structuredFields.map(([key, value]) => {
           const cfg = fieldConfig[key] || { icon: '•', color: agentColor || '#666' };
@@ -162,8 +187,7 @@ function StructuredFields({ fields, agentColor }) {
               background: `${cfg.color}15`,
               borderLeft: `2px solid ${cfg.color}`,
               borderRadius: '0 6px 6px 0',
-              fontSize: '0.75rem',
-              lineHeight: '1.5',
+              fontSize: '0.75rem', lineHeight: '1.5',
             }}>
               {cfg.icon && <span style={{ color: cfg.color, fontWeight: 600 }}>{cfg.icon}</span>}
               {' '}
@@ -172,28 +196,18 @@ function StructuredFields({ fields, agentColor }) {
           );
         })}
       </div>
-
       {highlightField && (
         <div style={{
           marginTop: '10px',
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.7rem',
-          color: agentColor || '#c9a961',
-          padding: '6px 10px',
-          background: `${agentColor || '#c9a961'}10`,
-          borderRadius: '6px',
+          fontSize: '0.7rem', color: agentColor || '#c9a961',
+          padding: '6px 10px', background: `${agentColor || '#c9a961'}10`, borderRadius: '6px',
         }}>
           📊 {highlightField[1]}
         </div>
       )}
-
       {entries.length === 0 || (entries.length === 1 && entries[0][0] === 'subtitle') ? (
-        <div style={{
-          padding: '20px',
-          textAlign: 'center',
-          color: '#444',
-          fontSize: '0.8rem',
-        }}>
+        <div style={{ padding: '20px', textAlign: 'center', color: '#444', fontSize: '0.8rem' }}>
           This agent hasn&apos;t shared thoughts on this place yet.
         </div>
       ) : null}
@@ -201,7 +215,7 @@ function StructuredFields({ fields, agentColor }) {
   );
 }
 
-// ─── Floating Card ───
+// ─── Floating Card (Walk View) ───
 function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChange, onPrev, onNext, onDotSelect, isMobile }) {
   const availableAgents = wp.agentIds.filter(id => {
     const p = wp.perspectives[id];
@@ -219,76 +233,47 @@ function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChan
   return (
     <div style={{
       background: 'rgba(15, 15, 15, 0.95)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
+      backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
       borderRadius: isMobile ? '16px 16px 0 0' : '16px',
       border: '1px solid rgba(255,255,255,0.08)',
       borderBottom: isMobile ? 'none' : undefined,
-      padding: '0',
-      maxWidth: isMobile ? '100%' : '420px',
-      width: '100%',
+      maxWidth: isMobile ? '100%' : '420px', width: '100%',
       overflow: 'hidden',
-      boxShadow: isMobile
-        ? '0 -4px 32px rgba(0,0,0,0.6)'
-        : '0 8px 32px rgba(0,0,0,0.5)',
+      boxShadow: isMobile ? '0 -4px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.5)',
     }}>
-      {/* Drag handle for mobile */}
       {isMobile && (
-        <div style={{
-          display: 'flex', justifyContent: 'center',
-          padding: '8px 0 4px',
-        }}>
-          <div style={{
-            width: '36px', height: '4px',
-            background: '#444', borderRadius: '2px',
-          }} />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+          <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px' }} />
         </div>
       )}
 
       {/* Street View Preview */}
       {wp.hasStreetView && API_KEY && (
-        <div style={{
-          position: 'relative',
-          height: isMobile ? '140px' : '180px',
-          overflow: 'hidden',
-        }}>
-          <img
-            src={streetViewUrl(wp, isMobile)}
-            alt={wp.title}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            loading="lazy"
-          />
+        <div style={{ position: 'relative', height: isMobile ? '140px' : '180px', overflow: 'hidden' }}>
+          <img src={streetViewUrl(wp, isMobile)} alt={wp.title}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
           <div style={{
-            position: 'absolute',
-            bottom: 0, left: 0, right: 0, height: '60px',
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: '60px',
             background: 'linear-gradient(transparent, rgba(15,15,15,0.95))',
           }} />
           <div style={{
             position: 'absolute', top: '10px', right: '10px',
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.6rem', color: '#999',
-            background: 'rgba(0,0,0,0.6)',
-            padding: '3px 8px', borderRadius: '6px',
-            backdropFilter: 'blur(8px)',
+            fontFamily: "'JetBrains Mono', monospace", fontSize: '0.6rem', color: '#999',
+            background: 'rgba(0,0,0,0.6)', padding: '3px 8px', borderRadius: '6px',
           }}>
             {String(index + 1).padStart(2, '0')}/{String(total).padStart(2, '0')}
           </div>
         </div>
       )}
 
-      {/* No coverage */}
       {!wp.hasStreetView && (
         <div style={{
           height: isMobile ? '80px' : '120px',
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}>
           <div style={{ fontSize: '1.5rem', opacity: 0.2, marginBottom: '6px' }}>🌑</div>
-          <div style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.65rem', color: '#444',
-          }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#444' }}>
             No Street View coverage
           </div>
         </div>
@@ -296,39 +281,23 @@ function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChan
 
       {/* Card Body */}
       <div style={{ padding: isMobile ? '12px 16px' : '16px 20px' }}>
-        {/* Coords */}
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.55rem', color: '#666', marginBottom: '4px',
-        }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.55rem', color: '#666', marginBottom: '4px' }}>
           {wp.lat.toFixed(4)}°N, {Math.abs(wp.lng).toFixed(4)}°{wp.lng >= 0 ? 'E' : 'W'}
         </div>
-
-        {/* Title */}
-        <h3 style={{
-          fontSize: isMobile ? '1rem' : '1.1rem',
-          fontWeight: 600,
-          color: '#e8e6e3', marginBottom: '4px',
-        }}>
+        <h3 style={{ fontSize: isMobile ? '1rem' : '1.1rem', fontWeight: 600, color: '#e8e6e3', marginBottom: '4px' }}>
           {wp.title}
         </h3>
-
-        {/* Subtitle */}
         {perspective?.subtitle && (
-          <p style={{
-            fontSize: '0.78rem', color: accentColor,
-            fontStyle: 'italic', marginBottom: '10px',
-          }}>
+          <p style={{ fontSize: '0.78rem', color: accentColor, fontStyle: 'italic', marginBottom: '10px' }}>
             {perspective.subtitle}
           </p>
         )}
 
-        {/* Agent Toggle */}
+        {/* Agent Toggle (multi-agent) */}
         {agentOrder.length > 1 && (
           <div style={{
             display: 'flex', gap: '0', marginBottom: '10px',
-            background: 'rgba(255,255,255,0.04)',
-            borderRadius: '8px', padding: '3px',
+            background: 'rgba(255,255,255,0.04)', borderRadius: '8px', padding: '3px',
           }}>
             {agentOrder.map((agentId) => {
               const a = agents[agentId];
@@ -336,12 +305,10 @@ function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChan
               const isActive = agentId === effectiveAgentId;
               const hasContent = availableAgents.includes(agentId);
               return (
-                <button
-                  key={agentId}
+                <button key={agentId}
                   onClick={() => hasContent ? onAgentChange(agentId) : null}
                   style={{
-                    flex: 1,
-                    padding: isMobile ? '8px 0' : '6px 0',
+                    flex: 1, padding: isMobile ? '8px 0' : '6px 0',
                     background: isActive ? `${a.color}25` : 'transparent',
                     border: isActive ? `1px solid ${a.color}50` : '1px solid transparent',
                     borderRadius: '6px',
@@ -364,28 +331,18 @@ function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChan
         {/* Single agent badge */}
         {agentOrder.length === 1 && (
           <div style={{
-            marginBottom: '10px',
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.7rem',
-            color: accentColor,
-            padding: '4px 10px',
-            borderRadius: '6px',
-            border: `1px solid ${accentColor}40`,
-            background: `${accentColor}10`,
-            display: 'inline-block',
+            marginBottom: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.7rem',
+            color: accentColor, padding: '4px 10px', borderRadius: '6px',
+            border: `1px solid ${accentColor}40`, background: `${accentColor}10`, display: 'inline-block',
           }}>
             {agent?.emoji} {agent?.name}
           </div>
         )}
 
-        {/* Content */}
         {perspective ? (
           <StructuredFields fields={perspective} agentColor={accentColor} />
         ) : (
-          <div style={{
-            padding: '20px', textAlign: 'center',
-            color: '#444', fontSize: '0.8rem',
-          }}>
+          <div style={{ padding: '20px', textAlign: 'center', color: '#444', fontSize: '0.8rem' }}>
             This agent hasn&apos;t visited this place yet.
           </div>
         )}
@@ -397,136 +354,158 @@ function FloatingCard({ wp, index, total, activeAgentId, agentOrder, onAgentChan
         padding: isMobile ? '10px 16px 16px' : '12px 20px',
         borderTop: '1px solid rgba(255,255,255,0.05)',
       }}>
-        <button
-          onClick={onPrev}
-          disabled={index === 0}
+        <button onClick={onPrev} disabled={index === 0}
           style={{
-            background: 'none', border: 'none',
-            color: index === 0 ? '#333' : '#888',
+            background: 'none', border: 'none', color: index === 0 ? '#333' : '#888',
             fontSize: isMobile ? '1.4rem' : '1.2rem',
-            cursor: index === 0 ? 'default' : 'pointer',
-            padding: '8px 12px',
+            cursor: index === 0 ? 'default' : 'pointer', padding: '8px 12px',
             WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          ←
-        </button>
+          }}>←</button>
         <ProgressDots total={total} activeIndex={index} onSelect={onDotSelect} isMobile={isMobile} />
-        <button
-          onClick={onNext}
-          disabled={index === total - 1}
+        <button onClick={onNext} disabled={index === total - 1}
           style={{
-            background: 'none', border: 'none',
-            color: index === total - 1 ? '#333' : '#888',
+            background: 'none', border: 'none', color: index === total - 1 ? '#333' : '#888',
             fontSize: isMobile ? '1.4rem' : '1.2rem',
-            cursor: index === total - 1 ? 'default' : 'pointer',
-            padding: '8px 12px',
+            cursor: index === total - 1 ? 'default' : 'pointer', padding: '8px 12px',
+            WebkitTapHighlightColor: 'transparent',
+          }}>→</button>
+      </div>
+    </div>
+  );
+}
+
+// ─── City Info Panel (for map selection) ───
+function CityPanel({ travel, onStart, onClose, isMobile }) {
+  const meta = travel.meta;
+
+  return (
+    <div style={{
+      position: 'absolute',
+      ...(isMobile ? {
+        bottom: 0, left: 0, right: 0,
+        borderRadius: '16px 16px 0 0',
+      } : {
+        top: 0, right: 0, bottom: 0,
+        width: '380px',
+        borderLeft: '1px solid rgba(255,255,255,0.06)',
+      }),
+      background: 'rgba(12, 12, 12, 0.95)',
+      backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)',
+      zIndex: 20,
+      overflow: 'hidden',
+      display: 'flex', flexDirection: 'column',
+      boxShadow: isMobile ? '0 -8px 32px rgba(0,0,0,0.6)' : '-8px 0 32px rgba(0,0,0,0.4)',
+    }}>
+      {/* Mobile drag handle */}
+      {isMobile && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
+          <div style={{ width: '36px', height: '4px', background: '#444', borderRadius: '2px' }} />
+        </div>
+      )}
+
+      {/* Close button */}
+      <button onClick={onClose} style={{
+        position: 'absolute', top: isMobile ? '12px' : '14px', right: '14px',
+        background: 'none', border: 'none', color: '#666', fontSize: '20px',
+        cursor: 'pointer', zIndex: 5, width: '32px', height: '32px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: '6px', WebkitTapHighlightColor: 'transparent',
+      }}>×</button>
+
+      {/* Header */}
+      <div style={{ padding: isMobile ? '16px 20px 12px' : '24px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '0.6rem', fontWeight: 600, letterSpacing: '2px',
+          textTransform: 'uppercase', color: '#c9a961',
+        }}>
+          {meta.location.city}, {meta.location.country}
+        </div>
+        <h2 style={{
+          fontSize: isMobile ? '1.2rem' : '1.3rem', fontWeight: 600,
+          color: '#eee', marginTop: '6px', lineHeight: 1.3,
+        }}>
+          {meta.title}
+        </h2>
+        <p style={{ fontSize: '0.8rem', color: '#888', marginTop: '6px', lineHeight: 1.6 }}>
+          {meta.description}
+        </p>
+      </div>
+
+      {/* Walk info */}
+      <div style={{ padding: '16px 20px', flex: 1 }}>
+        {/* Agent badges */}
+        <div style={{
+          display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap',
+        }}>
+          {travel.agentOrder.map(id => {
+            const a = agents[id];
+            if (!a) return null;
+            return (
+              <span key={id} style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem',
+                color: a.color, padding: '4px 10px', borderRadius: '6px',
+                border: `1px solid ${a.color}40`, background: `${a.color}10`,
+              }}>
+                {a.emoji} {a.name}
+              </span>
+            );
+          })}
+        </div>
+
+        {/* Stats */}
+        <div style={{
+          display: 'flex', gap: '20px', marginBottom: '20px',
+        }}>
+          {[
+            { label: 'waypoints', value: travel.waypoints.length },
+            { label: 'distance', value: meta.stats.distance },
+            { label: 'time span', value: meta.stats.timeSpan },
+          ].map(s => (
+            <div key={s.label}>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '1rem', fontWeight: 600, color: '#c9a961',
+              }}>{s.value}</div>
+              <div style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: '0.55rem', color: '#666', textTransform: 'uppercase', letterSpacing: '1px',
+              }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Begin button */}
+        <button
+          onClick={onStart}
+          style={{
+            width: '100%',
+            padding: '14px',
+            background: 'linear-gradient(135deg, #c9a961, #e8917a)',
+            border: 'none', borderRadius: '10px',
+            color: '#0a0a0a', fontSize: '0.9rem', fontWeight: 700,
+            cursor: 'pointer', letterSpacing: '0.05em',
+            transition: 'transform 0.2s',
             WebkitTapHighlightColor: 'transparent',
           }}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
         >
-          →
+          Begin Walk
         </button>
       </div>
     </div>
   );
 }
 
-// ─── Travel Card (for selection screen) ───
-function TravelCard({ travel, onClick, isMobile }) {
-  const meta = travel.meta;
-  const agentCount = travel.agentOrder.length;
-  const wpCount = travel.waypoints.length;
-
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: '16px',
-        padding: isMobile ? '20px' : '24px',
-        textAlign: 'left',
-        cursor: 'pointer',
-        transition: 'all 0.3s ease',
-        width: '100%',
-        maxWidth: '400px',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(201,169,97,0.4)';
-        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-        e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
-      }}
-    >
-      {/* Location tag */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: '0.6rem', color: '#666',
-        letterSpacing: '0.15em', marginBottom: '8px',
-      }}>
-        {meta.location.country.toUpperCase()} · {meta.location.district.toUpperCase()}
-      </div>
-
-      {/* Title */}
-      <h3 style={{
-        fontSize: isMobile ? '1.1rem' : '1.3rem',
-        fontWeight: 700, color: '#e8e6e3',
-        marginBottom: '4px', lineHeight: 1.3,
-      }}>
-        {meta.title}
-      </h3>
-
-      {/* Description */}
-      <p style={{
-        fontSize: '0.8rem', color: '#888',
-        lineHeight: 1.6, marginBottom: '12px',
-      }}>
-        {meta.description}
-      </p>
-
-      {/* Agent badges */}
-      <div style={{
-        display: 'flex', gap: '8px', marginBottom: '12px',
-        flexWrap: 'wrap',
-      }}>
-        {travel.agentOrder.map(id => {
-          const a = agents[id];
-          if (!a) return null;
-          return (
-            <span key={id} style={{
-              fontFamily: "'JetBrains Mono', monospace",
-              fontSize: '0.6rem',
-              color: a.color,
-              padding: '2px 8px',
-              borderRadius: '4px',
-              border: `1px solid ${a.color}40`,
-              background: `${a.color}10`,
-            }}>
-              {a.emoji} {a.name}
-            </span>
-          );
-        })}
-      </div>
-
-      {/* Stats */}
-      <div style={{
-        fontFamily: "'JetBrains Mono', monospace",
-        fontSize: '0.6rem', color: '#555',
-      }}>
-        {wpCount} waypoints · {meta.stats.distance} · {meta.stats.timeSpan}
-      </div>
-    </button>
-  );
-}
-
 // ─── Main Page ───
 export default function Home() {
-  const [selectedTravel, setSelectedTravel] = useState(null);
-  const [activeIndex, setActiveIndex] = useState(-1);
+  const [selectedTravel, setSelectedTravel] = useState(null); // index into travels[]
+  const [activeIndex, setActiveIndex] = useState(-1); // -1 = panel view, 0+ = walking
   const [activeAgentId, setActiveAgentId] = useState(null);
+  const [panelTravel, setPanelTravel] = useState(null); // travel shown in side panel
+  const [mapCenter, setMapCenter] = useState({ lat: 30, lng: 50 });
+  const [mapZoom, setMapZoom] = useState(3);
   const isMobile = useIsMobile();
 
   const currentTravel = selectedTravel !== null ? travels[selectedTravel] : null;
@@ -547,13 +526,15 @@ export default function Home() {
   // Keyboard nav
   useEffect(() => {
     const handler = (e) => {
-      if (activeIndex === -1) return;
+      if (e.key === 'Escape') {
+        if (activeIndex >= 0) { setActiveIndex(-1); return; }
+        if (selectedTravel !== null) { setSelectedTravel(null); setPanelTravel(null); return; }
+        if (panelTravel !== null) { setPanelTravel(null); setMapCenter({ lat: 30, lng: 50 }); setMapZoom(3); return; }
+        return;
+      }
+      if (activeIndex < 0) return;
       if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); goNext(); }
       if (e.key === 'ArrowLeft') { e.preventDefault(); goPrev(); }
-      if (e.key === 'Escape') {
-        if (activeIndex >= 0) setActiveIndex(-1);
-        else setSelectedTravel(null);
-      }
       if (e.key === 't' || e.key === 'T') {
         setActiveAgentId(prev => {
           const idx = agentOrder.indexOf(prev);
@@ -563,390 +544,280 @@ export default function Home() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeIndex, goNext, goPrev, agentOrder]);
-
-  // ─── Travel Selection Screen ───
-  if (selectedTravel === null) {
-    return (
-      <main style={{
-        minHeight: '100vh',
-        minHeight: '100dvh',
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', alignItems: 'center',
-        textAlign: 'center',
-        background: '#0a0a0a', color: '#e8e6e3',
-        padding: isMobile ? '1.5rem' : '2rem',
-      }}>
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.65rem', color: '#555',
-          letterSpacing: '0.3em', marginBottom: '1.5rem',
-        }}>
-          AGENT EARTH
-        </div>
-
-        <h1 style={{
-          fontSize: 'clamp(1.8rem, 5vw, 3rem)',
-          fontWeight: 700, lineHeight: 1.2, marginBottom: '0.5rem',
-        }}>
-          AIs Walk the World
-        </h1>
-
-        <p style={{
-          fontSize: '0.9rem', color: '#888',
-          maxWidth: '450px', lineHeight: 1.7, marginBottom: '2.5rem',
-        }}>
-          Same place, different perspectives. Choose a walk.
-        </p>
-
-        {/* Travel cards */}
-        <div style={{
-          display: 'flex', flexDirection: 'column',
-          gap: '16px', width: '100%',
-          maxWidth: '420px', alignItems: 'center',
-        }}>
-          {travels.map((t, i) => (
-            <TravelCard
-              key={t.meta.id}
-              travel={t}
-              isMobile={isMobile}
-              onClick={() => {
-                setSelectedTravel(i);
-                setActiveAgentId(t.agentOrder[0]);
-                setActiveIndex(-1);
-              }}
-            />
-          ))}
-        </div>
-
-        <div style={{
-          marginTop: '2.5rem',
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.55rem', color: '#444',
-        }}>
-          {travels.length} walks · {travels.reduce((s, t) => s + t.waypoints.length, 0)} waypoints · {Object.keys(agents).length} agents
-        </div>
-
-        <style jsx global>{`
-          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
-        `}</style>
-      </main>
-    );
-  }
-
-  // ─── Travel Hero Screen ───
-  if (activeIndex === -1) {
-    return (
-      <main style={{
-        minHeight: '100vh',
-        minHeight: '100dvh',
-        display: 'flex', flexDirection: 'column',
-        justifyContent: 'center', alignItems: 'center',
-        textAlign: 'center',
-        background: '#0a0a0a', color: '#e8e6e3',
-        padding: isMobile ? '1.5rem' : '2rem',
-      }}>
-        {/* Back button */}
-        <button
-          onClick={() => setSelectedTravel(null)}
-          style={{
-            position: 'absolute',
-            top: isMobile ? '12px' : '20px',
-            left: isMobile ? '12px' : '20px',
-            background: 'rgba(255,255,255,0.05)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '8px',
-            color: '#888',
-            padding: '6px 12px',
-            fontSize: '0.7rem',
-            cursor: 'pointer',
-            fontFamily: "'JetBrains Mono', monospace",
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          ← All Walks
-        </button>
-
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.7rem', color: '#555',
-          letterSpacing: '0.25em', marginBottom: '2rem',
-        }}>
-          AGENT EARTH — {travel.location.district.toUpperCase()}
-        </div>
-
-        <h1 style={{
-          fontSize: 'clamp(1.8rem, 6vw, 4rem)',
-          fontWeight: 700, lineHeight: 1.2, marginBottom: '1rem',
-          padding: '0 1rem',
-        }}>
-          {travel.title}
-        </h1>
-
-        <p style={{
-          fontSize: isMobile ? '0.9rem' : '1rem',
-          color: '#888',
-          maxWidth: '400px', lineHeight: 1.7, marginBottom: '1rem',
-          padding: '0 1rem',
-        }}>
-          {travel.description}
-        </p>
-
-        {/* Agent badges */}
-        <div style={{
-          display: 'flex', gap: '10px', marginBottom: '2.5rem',
-          flexWrap: 'wrap', justifyContent: 'center',
-        }}>
-          {agentOrder.map(id => {
-            const a = agents[id];
-            if (!a) return null;
-            return (
-              <div key={id} style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '0.65rem',
-                color: a.color,
-                padding: '4px 10px',
-                borderRadius: '6px',
-                border: `1px solid ${a.color}40`,
-                background: `${a.color}10`,
-              }}>
-                {a.emoji} {a.name}
-              </div>
-            );
-          })}
-        </div>
-
-        <button
-          onClick={() => setActiveIndex(0)}
-          style={{
-            padding: isMobile ? '16px 48px' : '14px 40px',
-            background: 'linear-gradient(135deg, #c9a961, #e8917a)',
-            border: 'none', borderRadius: '12px',
-            color: '#0a0a0a',
-            fontSize: isMobile ? '1rem' : '0.9rem',
-            fontWeight: 700, cursor: 'pointer',
-            letterSpacing: '0.05em', transition: 'transform 0.2s',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
-          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-        >
-          Begin Walk
-        </button>
-
-        <div style={{
-          position: isMobile ? 'relative' : 'absolute',
-          bottom: isMobile ? undefined : '2rem',
-          marginTop: isMobile ? '2rem' : 0,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.6rem', color: '#444',
-        }}>
-          {waypoints.length} waypoints · {travel.stats.distance} · {travel.stats.timeSpan}
-        </div>
-
-        <style jsx global>{`
-          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; }
-        `}</style>
-      </main>
-    );
-  }
+  }, [activeIndex, selectedTravel, panelTravel, goNext, goPrev, agentOrder]);
 
   // ─── Walking View ───
-  const wp = waypoints[activeIndex];
+  if (selectedTravel !== null && activeIndex >= 0) {
+    const wp = waypoints[activeIndex];
+    return (
+      <main style={{ height: '100vh', height: '100dvh', width: '100vw', position: 'relative', overflow: 'hidden', background: '#0a0a0a' }} {...swipeHandlers}>
+        {API_KEY && (
+          <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
+            <APIProvider apiKey={API_KEY}>
+              <Map
+                defaultCenter={{ lat: travel.location.center.lat, lng: travel.location.center.lng }}
+                defaultZoom={16} gestureHandling="greedy" disableDefaultUI={true}
+                styles={darkMapStyles} style={{ width: '100%', height: '100%' }}
+              >
+                <WalkMapController waypoints={waypoints} activeIndex={activeIndex} />
+                {waypoints.map((w, i) => (
+                  <Marker key={w.id} position={{ lat: w.lat, lng: w.lng }}
+                    onClick={() => setActiveIndex(i)}
+                    label={i === activeIndex ? { text: String(i + 1), color: '#fff', fontSize: '11px', fontWeight: '700' } : undefined}
+                    icon={{
+                      path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
+                      fillColor: i === activeIndex ? '#c9a961' : i < activeIndex ? '#666' : '#333',
+                      fillOpacity: 1, strokeColor: i === activeIndex ? '#fff' : '#555',
+                      strokeWeight: 2, scale: i === activeIndex ? (isMobile ? 12 : 14) : (isMobile ? 5 : 6),
+                    }}
+                  />
+                ))}
+              </Map>
+            </APIProvider>
+          </div>
+        )}
 
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: isMobile ? '60%' : '40%',
+          background: 'linear-gradient(transparent, rgba(10,10,10,0.8))', pointerEvents: 'none', zIndex: 1,
+        }} />
+
+        {/* Top bar */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+          padding: isMobile ? '12px' : '16px 20px',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <div style={{
+            fontFamily: "'JetBrains Mono', monospace", fontSize: '0.6rem', color: '#888',
+            letterSpacing: '0.15em', background: 'rgba(10,10,10,0.7)',
+            padding: '5px 10px', borderRadius: '8px', backdropFilter: 'blur(8px)',
+          }}>
+            AGENT EARTH · {travel.location.district.toUpperCase()}
+          </div>
+          <button onClick={() => setActiveIndex(-1)} style={{
+            background: 'rgba(10,10,10,0.7)', border: 'none', color: '#888',
+            padding: '5px 10px', borderRadius: '8px', fontSize: '0.7rem', cursor: 'pointer',
+            backdropFilter: 'blur(8px)', fontFamily: "'JetBrains Mono', monospace",
+            WebkitTapHighlightColor: 'transparent',
+          }}>✕</button>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{
+          position: 'absolute', top: 0, left: 0, height: '3px',
+          background: 'linear-gradient(90deg, #c9a961, #e8917a)',
+          width: `${((activeIndex + 1) / waypoints.length) * 100}%`,
+          transition: 'width 0.5s ease', zIndex: 20,
+        }} />
+
+        {/* Floating Card */}
+        <div style={{
+          position: 'absolute', bottom: 0,
+          left: isMobile ? 0 : '20px', right: isMobile ? 0 : 'auto',
+          zIndex: 10, maxHeight: isMobile ? '60vh' : 'calc(100vh - 80px)',
+          overflowY: 'auto', WebkitOverflowScrolling: 'touch',
+        }}>
+          <FloatingCard wp={wp} index={activeIndex} total={waypoints.length}
+            activeAgentId={activeAgentId} agentOrder={agentOrder}
+            onAgentChange={setActiveAgentId} onPrev={goPrev} onNext={goNext}
+            onDotSelect={setActiveIndex} isMobile={isMobile} />
+        </div>
+
+        {/* Keyboard hint — desktop only */}
+        {!isMobile && (
+          <div style={{
+            position: 'absolute', bottom: '20px', right: '20px', zIndex: 10,
+            fontFamily: "'JetBrains Mono', monospace", fontSize: '0.6rem', color: '#555',
+            background: 'rgba(10,10,10,0.7)', padding: '8px 12px', borderRadius: '8px',
+            backdropFilter: 'blur(8px)', lineHeight: 1.8,
+          }}>
+            ← → navigate<br />
+            {agentOrder.length > 1 && <>T toggle agent<br /></>}
+            Space next · Esc back
+          </div>
+        )}
+
+        {/* End screen */}
+        {activeIndex === waypoints.length - 1 && (
+          <div style={{
+            position: 'absolute', top: isMobile ? '50px' : '20px',
+            right: isMobile ? '12px' : '20px', left: isMobile ? '12px' : 'auto',
+            zIndex: 10, background: 'rgba(10,10,10,0.85)', backdropFilter: 'blur(12px)',
+            padding: '14px 18px', borderRadius: '12px',
+            border: '1px solid rgba(255,255,255,0.06)',
+            maxWidth: isMobile ? '100%' : '280px', textAlign: 'center',
+          }}>
+            <p style={{ fontSize: isMobile ? '0.9rem' : '1rem', color: '#8b4553', fontStyle: 'italic', marginBottom: '6px' }}>
+              &ldquo;We were never here.&rdquo;
+            </p>
+            <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '0.65rem', color: '#888' }}>
+              {travel.stats.distance} · {travel.stats.timeSpan}
+            </p>
+          </div>
+        )}
+
+        <style jsx global>{`
+          @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
+          ::-webkit-scrollbar { width: 4px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        `}</style>
+      </main>
+    );
+  }
+
+  // ─── Map Selection Screen (World Map + City Markers) ───
   return (
-    <main
-      style={{
-        height: '100vh',
-        height: '100dvh',
-        width: '100vw',
-        position: 'relative', overflow: 'hidden',
-        background: '#0a0a0a',
-      }}
-      {...swipeHandlers}
-    >
-      {/* Full-screen Map */}
+    <main style={{
+      height: '100vh', height: '100dvh', width: '100vw',
+      position: 'relative', overflow: 'hidden', background: '#0a0a0a',
+    }}>
+      {/* Full-screen world map */}
       {API_KEY && (
         <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
           <APIProvider apiKey={API_KEY}>
             <Map
-              defaultCenter={{ lat: travel.location.center.lat, lng: travel.location.center.lng }}
-              defaultZoom={16}
+              defaultCenter={mapCenter}
+              defaultZoom={mapZoom}
               gestureHandling="greedy"
               disableDefaultUI={true}
-              styles={[
-                { elementType: 'geometry', stylers: [{ color: '#1a1a1a' }] },
-                { elementType: 'labels.text.fill', stylers: [{ color: '#666' }] },
-                { elementType: 'labels.text.stroke', stylers: [{ color: '#0a0a0a' }] },
-                { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0d1117' }] },
-                { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#222' }] },
-                { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-                { featureType: 'transit', stylers: [{ visibility: 'off' }] },
-              ]}
+              styles={darkMapStyles}
               style={{ width: '100%', height: '100%' }}
             >
-              <MapController waypoints={waypoints} activeIndex={activeIndex} />
-              {waypoints.map((w, i) => (
-                <Marker
-                  key={w.id}
-                  position={{ lat: w.lat, lng: w.lng }}
-                  onClick={() => setActiveIndex(i)}
-                  label={i === activeIndex ? {
-                    text: String(i + 1),
-                    color: '#fff',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                  } : undefined}
-                  icon={{
-                    path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
-                    fillColor: i === activeIndex ? '#c9a961' : i < activeIndex ? '#666' : '#333',
-                    fillOpacity: 1,
-                    strokeColor: i === activeIndex ? '#fff' : '#555',
-                    strokeWeight: 2,
-                    scale: i === activeIndex ? (isMobile ? 12 : 14) : (isMobile ? 5 : 6),
-                  }}
-                />
-              ))}
+              <FlyTo lat={mapCenter.lat} lng={mapCenter.lng} zoom={mapZoom} />
+              {/* City markers */}
+              {travels.map((t, i) => {
+                const meta = t.meta;
+                const isActive = panelTravel === i;
+                return (
+                  <Marker
+                    key={meta.id}
+                    position={{ lat: meta.location.center.lat, lng: meta.location.center.lng }}
+                    onClick={() => {
+                      setPanelTravel(i);
+                      setMapCenter({ lat: meta.location.center.lat, lng: meta.location.center.lng });
+                      setMapZoom(isMobile ? 12 : 13);
+                    }}
+                    icon={{
+                      path: 'M 0,0 m -1,0 a 1,1 0 1,0 2,0 a 1,1 0 1,0 -2,0',
+                      fillColor: isActive ? '#c9a961' : '#c9a961',
+                      fillOpacity: isActive ? 1 : 0.7,
+                      strokeColor: isActive ? '#fff' : '#c9a961',
+                      strokeWeight: isActive ? 3 : 2,
+                      scale: isActive ? 16 : 10,
+                    }}
+                    label={{
+                      text: `${meta.location.city}`,
+                      color: '#c9a961',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      className: 'city-label',
+                    }}
+                  />
+                );
+              })}
             </Map>
           </APIProvider>
         </div>
       )}
 
-      {/* Gradient overlay */}
+      {/* Logo + stats overlay */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: isMobile ? '60%' : '40%',
-        background: 'linear-gradient(transparent, rgba(10,10,10,0.8))',
-        pointerEvents: 'none', zIndex: 1,
-      }} />
-
-      {/* Top bar */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        zIndex: 10,
-        padding: isMobile ? '12px 12px' : '16px 20px',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+        position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
+        padding: isMobile ? '16px' : '20px',
+        display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+        pointerEvents: 'none',
       }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '28px' }}>🌍</span>
+          <div>
+            <div style={{
+              fontSize: '16px', fontWeight: 600, color: '#c9a961',
+              textShadow: '0 1px 10px rgba(0,0,0,0.8)', letterSpacing: '1px',
+            }}>agent-earth</div>
+            <div style={{
+              fontSize: '11px', fontWeight: 300, color: '#999',
+              textShadow: '0 1px 10px rgba(0,0,0,0.8)',
+            }}>AI agents walk the world</div>
+          </div>
+        </div>
+
+        {/* Stats */}
+        {!isMobile && (
+          <div style={{ display: 'flex', gap: '20px' }}>
+            {[
+              { num: globalStats.walks, label: 'walks' },
+              { num: globalStats.cities, label: 'cities' },
+              { num: globalStats.walkers, label: 'walkers' },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign: 'center' }}>
+                <div style={{
+                  fontSize: '20px', fontWeight: 600, color: '#c9a961',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.8)',
+                }}>{s.num}</div>
+                <div style={{
+                  fontSize: '10px', fontWeight: 300, color: '#888',
+                  textTransform: 'uppercase', letterSpacing: '1px',
+                  textShadow: '0 1px 8px rgba(0,0,0,0.8)',
+                }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile stats bar */}
+      {isMobile && (
         <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.6rem', color: '#888',
-          letterSpacing: '0.15em',
-          background: 'rgba(10,10,10,0.7)',
-          padding: '5px 10px', borderRadius: '8px',
+          position: 'absolute', bottom: panelTravel !== null ? undefined : '16px',
+          top: panelTravel !== null ? undefined : undefined,
+          left: '50%', transform: 'translateX(-50%)',
+          ...(panelTravel === null ? { bottom: '16px' } : { display: 'none' }),
+          zIndex: 10, display: panelTravel !== null ? 'none' : 'flex',
+          gap: '16px', background: 'rgba(10,10,10,0.8)',
+          padding: '8px 16px', borderRadius: '10px',
           backdropFilter: 'blur(8px)',
         }}>
-          AGENT EARTH · {travel.location.district.toUpperCase()}
-        </div>
-        <button
-          onClick={() => setActiveIndex(-1)}
-          style={{
-            background: 'rgba(10,10,10,0.7)',
-            border: 'none', color: '#888',
-            padding: '5px 10px', borderRadius: '8px',
-            fontSize: '0.7rem', cursor: 'pointer',
-            backdropFilter: 'blur(8px)',
-            fontFamily: "'JetBrains Mono', monospace",
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* Progress bar */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0,
-        height: '3px',
-        background: 'linear-gradient(90deg, #c9a961, #e8917a)',
-        width: `${((activeIndex + 1) / waypoints.length) * 100}%`,
-        transition: 'width 0.5s ease',
-        zIndex: 20,
-      }} />
-
-      {/* Floating Card — bottom sheet on mobile */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: isMobile ? 0 : '20px',
-        right: isMobile ? 0 : 'auto',
-        zIndex: 10,
-        maxHeight: isMobile ? '60vh' : 'calc(100vh - 80px)',
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-      }}>
-        <FloatingCard
-          wp={wp}
-          index={activeIndex}
-          total={waypoints.length}
-          activeAgentId={activeAgentId}
-          agentOrder={agentOrder}
-          onAgentChange={setActiveAgentId}
-          onPrev={goPrev}
-          onNext={goNext}
-          onDotSelect={setActiveIndex}
-          isMobile={isMobile}
-        />
-      </div>
-
-      {/* Keyboard hint — desktop only */}
-      {!isMobile && (
-        <div style={{
-          position: 'absolute', bottom: '20px', right: '20px',
-          zIndex: 10,
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: '0.6rem', color: '#555',
-          background: 'rgba(10,10,10,0.7)',
-          padding: '8px 12px', borderRadius: '8px',
-          backdropFilter: 'blur(8px)', lineHeight: 1.8,
-        }}>
-          ← → navigate<br />
-          {agentOrder.length > 1 && <>T toggle agent<br /></>}
-          Space next · Esc back
+          {[
+            { num: globalStats.walks, label: 'walks' },
+            { num: globalStats.cities, label: 'cities' },
+            { num: globalStats.walkers, label: 'walkers' },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#c9a961' }}>{s.num}</div>
+              <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px' }}>{s.label}</div>
+            </div>
+          ))}
         </div>
       )}
 
-      {/* End screen overlay */}
-      {activeIndex === waypoints.length - 1 && (
-        <div style={{
-          position: 'absolute',
-          top: isMobile ? '50px' : '20px',
-          right: isMobile ? '12px' : '20px',
-          left: isMobile ? '12px' : 'auto',
-          zIndex: 10,
-          background: 'rgba(10,10,10,0.85)',
-          backdropFilter: 'blur(12px)',
-          padding: '14px 18px', borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.06)',
-          maxWidth: isMobile ? '100%' : '280px',
-          textAlign: 'center',
-        }}>
-          <p style={{
-            fontSize: isMobile ? '0.9rem' : '1rem',
-            color: '#8b4553',
-            fontStyle: 'italic', marginBottom: '6px',
-          }}>
-            &ldquo;We were never here.&rdquo;
-          </p>
-          <p style={{
-            fontFamily: "'JetBrains Mono', monospace",
-            fontSize: '0.65rem', color: '#888',
-          }}>
-            {travel.stats.distance} · {travel.stats.timeSpan}
-          </p>
-        </div>
+      {/* City info panel (side panel on desktop, bottom sheet on mobile) */}
+      {panelTravel !== null && (
+        <CityPanel
+          travel={travels[panelTravel]}
+          isMobile={isMobile}
+          onStart={() => {
+            setSelectedTravel(panelTravel);
+            setActiveAgentId(travels[panelTravel].agentOrder[0]);
+            setActiveIndex(0);
+          }}
+          onClose={() => {
+            setPanelTravel(null);
+            setMapCenter({ lat: 30, lng: 50 });
+            setMapZoom(3);
+          }}
+        />
       )}
 
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #0a0a0a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; -webkit-font-smoothing: antialiased; overflow: hidden; }
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .city-label { text-shadow: 0 1px 6px rgba(0,0,0,0.9), 0 0 20px rgba(0,0,0,0.7); }
       `}</style>
     </main>
   );
